@@ -68,7 +68,7 @@ pcon_lad <- read_csv(pcon_lad_url) %>%
   select(starts_with(c("pcon", "lad"))) %>%
   distinct() %>%
   mutate(across(pcon20nm, ~ case_when(
-    . == "Birmingham,  Selly Oak" ~ "Birmingham, Selly Oak",
+    . == "Birmingham,  Selly Oak" ~ "Birmingham, Selly Oak", # minor fix
     TRUE ~ .
   )))
 
@@ -78,30 +78,40 @@ pcon_lad <- read_csv(pcon_lad_url) %>%
 
 pcon_bounds <- st_read(pcon_bounds_url) %>%
   clean_names() %>%
-  select(starts_with(c("pcon", "bng"))) %>%
+  select(starts_with(c("pcon"))) %>%
   rename_with(~ str_replace_all(., "^pcon19", "pcon20")) %>%
-  rename_with(~ str_replace_all(., "^bng", "centroid")) %>%
   mutate(across(pcon20nm, ~ case_when(
-    . == "Weston-Super-Mare" ~ "Weston-super-Mare",
-    . == "Ynys Mon" ~ "Ynys Môn",
+    . == "Weston-Super-Mare" ~ "Weston-super-Mare", # fix ONS src data
+    . == "Ynys Mon" ~ "Ynys Môn", # fix ONS src data for join success
     TRUE ~ .
   ))) %>%
-  inner_join(pcon_lad) %>%
-  dplyr::relocate(starts_with("centroid"), .after = lad20nm)
+  inner_join(pcon_lad)
 
 
 
 msoa_bounds <- st_read(msoa_bounds_url) %>%
   clean_names() %>%
-  select(starts_with(c("msoa", "bng", "shape_area"))) %>%
-  rename_with(~ str_replace_all(., "^bng", "centroid")) %>%
+  # select(starts_with(c("msoa", "bng", "shape_area"))) %>%
+  select(starts_with(c("msoa", "shape_area"))) %>%
+  # rename_with(~ str_replace_all(., "^bng", "centroid")) %>%
   left_join(msoa_lad) %>%
-  dplyr::relocate(starts_with(c("centroid", "shape")), .after = rgn20nm)
+  # dplyr::relocate(starts_with(c("centroid", "shape")), .after = rgn20nm)
+  dplyr::relocate(shape_area, .after = rgn20nm)
 
 
+
+# population-weighted centroids as opposed to pure geo centroids
 msoa_centroids <- st_read(msoa_centroids_url) %>%
   clean_names() %>%
   select(starts_with("msoa")) %>%
   left_join(msoa_lad)
 
+
+
+# Do the calculations of overlap etc --------------------------------------
+
+# see calc_overlaps_job.R
+
+msoa_pcon_lookup %>%
+  write_csv(here("msoa_pcon_lookup.csv"))
 
