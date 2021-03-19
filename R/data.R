@@ -47,9 +47,11 @@ msoa_centroids_url <- "https://opendata.arcgis.com/datasets/b0a6d8a3dc5d4718b3fd
 
 msoa_lad <- read_csv(msoa_lad_url) %>%
   clean_names() %>%
+  # just get a row for each MSOA (get rid of LSOA etc and any dupl. rows):
   select(starts_with(c("msoa", "lad", "rgn"))) %>%
   distinct()
 
+# House of Commons Library MSOA Names
 msoa_names <- read_csv(hocl_msoa_names_url) %>%
   clean_names() %>%
   select(!laname)
@@ -64,11 +66,15 @@ msoa_lad <- msoa_names %>%
 
 pcon_lad <- read_csv(pcon_lad_url) %>%
   clean_names() %>%
+  # Only keep constituencies in England and Wales:
   filter(across(wd20cd, ~ str_detect(., "^[E|W]"))) %>%
   select(starts_with(c("pcon", "lad"))) %>%
+  # we end up with 776 rows which is much higher than the number of
+  # constituencies, because some are split across LADs
   distinct() %>%
+  # minor fix due to ONS data inconsistency:
   mutate(across(pcon20nm, ~ case_when(
-    . == "Birmingham,  Selly Oak" ~ "Birmingham, Selly Oak", # minor fix
+    . == "Birmingham,  Selly Oak" ~ "Birmingham, Selly Oak",
     TRUE ~ .
   )))
 
@@ -79,39 +85,51 @@ pcon_lad <- read_csv(pcon_lad_url) %>%
 pcon_bounds <- st_read(pcon_bounds_url) %>%
   clean_names() %>%
   select(starts_with(c("pcon"))) %>%
+  # naughty but necessary:
   rename_with(~ str_replace_all(., "^pcon19", "pcon20")) %>%
+  # minor fixes due to ONS data inconsistency:
   mutate(across(pcon20nm, ~ case_when(
-    . == "Weston-Super-Mare" ~ "Weston-super-Mare", # fix ONS src data
-    . == "Ynys Mon" ~ "Ynys Môn", # fix ONS src data for join success
+    . == "Weston-Super-Mare" ~ "Weston-super-Mare",
+    . == "Ynys Mon" ~ "Ynys Môn",
     TRUE ~ .
   ))) %>%
+  # only keep boundaries in England and Wales:
   inner_join(pcon_lad)
 
 
 
 msoa_bounds <- st_read(msoa_bounds_url) %>%
   clean_names() %>%
-  # select(starts_with(c("msoa", "bng", "shape_area"))) %>%
   select(starts_with(c("msoa", "shape_area"))) %>%
-  # rename_with(~ str_replace_all(., "^bng", "centroid")) %>%
   left_join(msoa_lad) %>%
-  # dplyr::relocate(starts_with(c("centroid", "shape")), .after = rgn20nm)
-  dplyr::relocate(shape_area, .after = rgn20nm)
+  relocate(shape_area, .after = rgn20nm)
 
 
 
 # population-weighted centroids as opposed to pure geo centroids
 msoa_centroids <- st_read(msoa_centroids_url) %>%
   clean_names() %>%
-  select(starts_with("msoa")) %>%
-  left_join(msoa_lad)
-
+  select(starts_with("msoa"))
 
 
 # Do the calculations of overlap etc --------------------------------------
 
 # see calc_overlaps_job.R
 
+names <- msoa_pcon_lookup %>%
+  select(starts_with("msoa")) %>%
+  distinct() %>%
+  pull(msoa11hclnm)
+
 msoa_pcon_lookup %>%
+  filter(contains_msoa_centroid) %>%
+  pull(msoa11hclnm) %>%
+  setdiff(names, .)
+
+
+
+msoa_pcon_lookup %>%
+  reduce(bind_rows) %>%
+  add_count(msoa11cd, name = cons_overlapped, sort = TRUE) %>%
   write_csv(here("msoa_pcon_lookup.csv"))
 

@@ -20,7 +20,11 @@ scan_local_constituencies <- function(msoa, msoa_centroids_df, pcon_df) {
         sf::st_area() %>%
         as.numeric()
 
-      contains_centroid <- sf::st_contains(pcon_area, msoa_centroid, sparse = FALSE) %>%
+      contains_centroid <- sf::st_contains(
+          pcon_area,
+          msoa_centroid,
+          sparse = FALSE
+        ) %>%
         any()
 
     } else {
@@ -50,11 +54,10 @@ scan_local_constituencies <- function(msoa, msoa_centroids_df, pcon_df) {
     dplyr::select(dplyr::starts_with("pcon")) %>%
     split(.$pcon20cd) %>%
     purrr::map_df(~ mutate_intersection(., msoa)) %>%
-    # dplyr::filter(!is.na(intersect_area)) %>% # weirdly doesn't seem to work?
-    # dplyr::filter(intersect_area > 0)
-    dplyr::filter(intersect_pct > 0) %>% # assume tiny intersects are artifacts
+    # assume tiny (< 0.5%) intersects are just boundary artifacts:
+    dplyr::filter(intersect_pct > 0) %>%
     dplyr::mutate(best_fit = dplyr::case_when(
-      intersect_pct == max(intersect_pct) ~ TRUE,
+      intersect_area == max(intersect_area) ~ TRUE,
       TRUE ~ FALSE
     ))
 }
