@@ -69,15 +69,13 @@ pcon_lad <- read_csv(pcon_lad_url) %>%
   # Only keep constituencies in England and Wales:
   filter(across(wd20cd, ~ str_detect(., "^[E|W]"))) %>%
   select(starts_with(c("pcon", "lad"))) %>%
-  # we end up with 776 rows which is much higher than the number of
-  # constituencies, because some are split across LADs
-  distinct() %>%
   # minor fix due to ONS data inconsistency:
-  mutate(across(pcon20nm, ~ case_when(
-    . == "Birmingham,  Selly Oak" ~ "Birmingham, Selly Oak",
-    TRUE ~ .
-  )))
-
+  mutate(across(pcon20nm, ~ stringr::str_replace(.,
+      "Birmingham,  Selly Oak",
+      "Birmingham, Selly Oak"))) %>%
+  # we end up with 775 rows which is much higher than the number of
+  # constituencies, because some are split across LADs
+  distinct()
 
 
 # Build sf (geographical) tibbles -----------------------------------------
@@ -101,8 +99,8 @@ pcon_bounds <- st_read(pcon_bounds_url) %>%
 msoa_bounds <- st_read(msoa_bounds_url) %>%
   clean_names() %>%
   select(starts_with(c("msoa", "shape_area"))) %>%
-  left_join(msoa_lad) %>%
-  relocate(shape_area, .after = rgn20nm)
+  inner_join(msoa_lad) %>%
+  relocate(shape_area, .before = last_col())
 
 
 
@@ -112,24 +110,4 @@ msoa_centroids <- st_read(msoa_centroids_url) %>%
   select(starts_with("msoa"))
 
 
-# Do the calculations of overlap etc --------------------------------------
-
-# see calc_overlaps_job.R
-
-names <- msoa_pcon_lookup %>%
-  select(starts_with("msoa")) %>%
-  distinct() %>%
-  pull(msoa11hclnm)
-
-msoa_pcon_lookup %>%
-  filter(contains_msoa_centroid) %>%
-  pull(msoa11hclnm) %>%
-  setdiff(names, .)
-
-
-
-msoa_pcon_lookup %>%
-  reduce(bind_rows) %>%
-  add_count(msoa11cd, name = cons_overlapped, sort = TRUE) %>%
-  write_csv(here("msoa_pcon_lookup.csv"))
 
