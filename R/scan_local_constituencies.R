@@ -41,7 +41,7 @@ scan_local_constituencies <- function(msoa, msoa_centroids_df, pcon_df) {
       sf::st_drop_geometry() %>%
       dplyr::mutate(contains_msoa_centroid = contains_centroid) %>%
       dplyr::mutate(intersect_area = intersection_area) %>%
-      dplyr::mutate(intersect_pct = round(100*intersect_area/shape_area))
+      dplyr::mutate(intersect_pct = janitor::round_half_up(100*intersect_area/shape_area))
   }
 
 

@@ -1,6 +1,9 @@
 library(here)
+library(dplyr)
+library(purrr)
+library(sf)
 
-source(here("R/data.R"))
+# source(here("R/data.R"))
 source(here("R/scan_local_constituencies.R"))
 
 
